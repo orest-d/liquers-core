@@ -8,11 +8,11 @@ extern crate serde_yaml;
 #[macro_use]
 extern crate serde_derive;
 
-mod value;
-mod error;
-mod query;
-mod parse;
-mod action_registry;
+pub mod value;
+pub mod error;
+pub mod query;
+pub mod parse;
+pub mod action_registry;
 
 #[cfg(test)]
 mod tests {

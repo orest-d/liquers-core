@@ -10,7 +10,8 @@ pub enum Value{
     None,
     Text(String),
     Integer(i32),
-    Real(f64)
+    Real(f64),
+    Bool(bool)
 }
 
 trait ValueSerializer where Self:Sized{
@@ -28,6 +29,7 @@ impl ValueSerializer for Value{
             Value::Text(_) => String::from("text"),
             Value::Integer(_) => String::from("int"),
             Value::Real(_) => String::from("real"),
+            Value::Bool(_) => String::from("bool"),
         }
     }
     fn default_extension(&self)->String{
@@ -56,8 +58,9 @@ impl TryFrom<Value> for i32{
         match value{
             Value::None => Err(Error::ConversionError{message:format!("Can't convert None to integer")}),
             Value::Text(_) => Err(Error::ConversionError{message:format!("Can't convert Text to integer")}),
+            Value::Bool(_) => Err(Error::ConversionError{message:format!("Can't convert Bool to integer")}),
             Value::Integer(x) => Ok(x),
-            Value::Real(x) => Ok(x as i32),           
+            Value::Real(_) => Err(Error::ConversionError{message:format!("Can't convert real number to integer")}),
         }
     }
 }
@@ -65,6 +68,50 @@ impl TryFrom<Value> for i32{
 impl From<i32> for Value{
     fn from(value: i32) -> Value{
         Value::Integer(value)
+    }
+}
+
+impl TryFrom<Value> for f64{
+    type Error=Error;
+    fn try_from(value: Value) -> Result<Self, Self::Error>{
+        match value{
+            Value::None => Err(Error::ConversionError{message:format!("Can't convert None to real number")}),
+            Value::Text(_) => Err(Error::ConversionError{message:format!("Can't convert Text to real number")}),
+            Value::Bool(_) => Err(Error::ConversionError{message:format!("Can't convert Bool to real number")}),
+            Value::Integer(x) => Ok(x as f64),
+            Value::Real(x) => Ok(x),
+        }
+    }
+}
+
+impl From<f64> for Value{
+    fn from(value: f64) -> Value{
+        Value::Real(value)
+    }
+}
+
+impl TryFrom<Value> for bool{
+    type Error=Error;
+    fn try_from(value: Value) -> Result<Self, Self::Error>{
+        match value{
+            Value::None => Ok(false),
+            Value::Text(x) => {
+                match &x.to_lowercase()[..]{
+                    "true" => Ok(true),
+                    "false" => Ok(false),
+                    _ => Err(Error::ConversionError{message:format!("Can't convert Text {} to bool",x)})
+                }
+            },
+            Value::Bool(x) => Ok(x),
+            Value::Integer(x) => Ok(x!=0),
+            Value::Real(x) => Ok(x!=0.0),
+        }
+    }
+}
+
+impl From<bool> for Value{
+    fn from(value: bool) -> Value{
+        Value::Bool(value)
     }
 }
 
@@ -76,6 +123,7 @@ impl TryFrom<Value> for String{
             Value::Text(x) => Ok(x),
             Value::Integer(x) => Ok(format!("{}",x)),
             Value::Real(x) => Ok(format!("{}",x)),           
+            Value::Bool(x) => Ok(format!("{}",x)),
         }
     }
 }
@@ -115,8 +163,8 @@ mod tests{
     #[test]
     fn test_convert_real() -> Result<(), Box<dyn std::error::Error>>{
         let v = Value::Real(123.1);
-        let x:i32 = v.try_into()?;
-        assert_eq!(x,123);
+        let x:f64 = v.try_into()?;
+        assert_eq!(x,123.1);
         Ok(())
     }   
     #[test]
@@ -125,6 +173,14 @@ mod tests{
         assert_eq!(v,Value::Text("abc".to_owned()));
         let x:String = v.try_into()?;
         assert_eq!(x,"abc");
+        Ok(())
+    }   
+    #[test]
+    fn test_convert_bool() -> Result<(), Box<dyn std::error::Error>>{
+        let v = Value::from(true);
+        assert_eq!(v,Value::Bool(true));
+        let v = Value::from(false);
+        assert_eq!(v,Value::Bool(false));
         Ok(())
     }   
 }
