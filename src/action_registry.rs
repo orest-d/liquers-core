@@ -49,8 +49,8 @@ where
     }
 }
 
-pub struct Function1<In,Out>(pub Box<dyn Fn(In)->Out + Send>);
-pub struct Function2<In1,In2,Out>(pub Box<dyn Fn(In1,In2)->Out + Send>);
+pub struct Function1<In,Out>(pub Box<dyn Fn(In)->Out /*+ Send*/>);
+pub struct Function2<In1,In2,Out>(pub Box<dyn Fn(In1,In2)->Out /*+ Send*/>);
 /*
 fn call1<T,In,Out>(f:Function1<In,Out>,input:T)->Result<T, Error>
 where
@@ -103,7 +103,7 @@ where
 pub struct HashMapActionRegistry<T>(
     HashMap<
         String,
-        HashMap<String, Box<dyn CallableAction<T> + Send>>  
+        HashMap<String, Box<dyn CallableAction<T> /*+ Send*/>>  
     >
 );
 
@@ -112,7 +112,7 @@ impl<T> HashMapActionRegistry<T>{
         HashMapActionRegistry::<T>(HashMap::new())
     }
 
-    pub fn register_callable_action(&mut self, ns:&str, name:&str, action:Box<dyn CallableAction<T> + Send>){
+    pub fn register_callable_action(&mut self, ns:&str, name:&str, action:Box<dyn CallableAction<T> /*+ Send*/>){
         let ns = ns.to_owned();
         let name = name.to_owned();
         let ns_registry = self.0.entry(ns).or_insert(HashMap::new());
