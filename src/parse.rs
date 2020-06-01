@@ -1,14 +1,19 @@
+#[macro_use]
 use nom;
 
 extern crate nom_locate;
 use nom_locate::LocatedSpan;
 
 
-use nom::bytes::complete::{tag, take_while, take_while1};
 use nom::*;
+use nom::bytes::complete::{tag, take_while, take_while1};
+use nom::character::complete::{digit1};
 use nom::multi::{many0, separated_list};
 use nom::character::{is_alphanumeric, is_alphabetic};
+use nom::combinator::{cut};
+use nom::branch::{alt};
 use nom::sequence::pair;
+
 
 use crate::query::{ActionParameter, ActionRequest, Position};
 use crate::error::Error;
@@ -31,11 +36,33 @@ fn identifier(text:Span) ->IResult<Span, String>{
 
     Ok((text, format!("{}{}",a,b)))
 }
+
+fn parameter_text(text:Span) ->IResult<Span, String>{
+    let (text, par) =take_while1(|c| {is_alphanumeric(c as u8)||c=='_'})(text)?;
+    Ok((text, format!("{}",par)))
+}
+
+fn tilde_entity(text:Span) ->IResult<Span, String>{
+    let (text, _tilde) = tag("~")(text)?;
+    Ok((text, "~".to_owned()))
+}
+
+fn negative_number_entity(text:Span) ->IResult<Span, String>{
+    let (text, number) = digit1(text)?;
+    Ok((text, format!("-{}",number)))
+}
+
+fn parameter_entity(text:Span) ->IResult<Span, String>{
+    let (text, _start) = tag("~")(text)?;
+    let position:Position = text.into();
+    let (text, entity) = cut(alt((tilde_entity, negative_number_entity)))(text)?;
+    Ok((text, format!("{}",entity)))
+}
+
 fn parameter(text:Span) ->IResult<Span, ActionParameter>{
     let position:Position = text.into();
-    let (text, par) =take_while(|c| {c!='-'&&c!='/'})(text)?;
-
-    Ok((text, ActionParameter::new_parsed(par.to_string(), position)))
+    let (text, par) =many0(alt((parameter_text, parameter_entity)))(text)?;
+    Ok((text, ActionParameter::new_parsed(par.join(""), position)))
 }
 
 
@@ -91,10 +118,40 @@ mod tests{
     fn parse_query_test() -> Result<(), Error>{
         let path  = parse_query("")?;
         assert_eq!(path.len(),0);
-        let path  = parse_query("abc-def")?;
-        assert_eq!(path.len(),1);
+        let path  = parse_query("abc-def");
+        println!("{:#?}",path);
+/*        assert_eq!(path.len(),1);
         let path  = parse_query("abc-def/xxx-123")?;
-        assert_eq!(path.len(),2);
+        assert_eq!(path.len(),2);*/
+        Ok(())
+    }
+
+    #[test]
+    fn parse_parameter_entity_test() -> Result<(), Error>{
+        let path  = parse_query("abc-~~x-~123")?;
+        assert_eq!(path.len(),1);
+        if let ActionParameter::String(txt,_pos) = &path[0].parameters[0]{
+            assert_eq!(txt, "~x");
+        }
+        else{
+            assert!(false);
+        }
+        if let ActionParameter::String(txt,_pos) = &path[0].parameters[1]{
+            assert_eq!(txt, "-123");
+        }
+        else{
+            assert!(false);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn parse_simple_parameter_test() -> Result<(), Box<dyn std::error::Error>>{
+        let (remainder,param)  = parameter(Span::new("abc"))?;
+        match &param{
+            ActionParameter::String(s,_)=>assert_eq!(s,"abc"),
+            _ => assert!(false)
+        }
         Ok(())
     }
 
