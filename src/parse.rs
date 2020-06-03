@@ -6,14 +6,15 @@ use nom_locate::LocatedSpan;
 
 
 use nom::*;
-use nom::bytes::complete::{tag, take_while, take_while1};
+use nom::bytes::complete::{tag, take_while, take_while1, take_while_m_n};
 use nom::character::complete::{digit1};
 use nom::multi::{many0, separated_list};
-use nom::character::{is_alphanumeric, is_alphabetic};
+use nom::character::{is_alphanumeric, is_alphabetic, is_hex_digit};
 use nom::combinator::{cut};
 use nom::branch::{alt};
 use nom::sequence::pair;
 
+use percent_encoding::{percent_decode_str, PercentDecode};
 
 use crate::query::{ActionParameter, ActionRequest, Position};
 use crate::error::Error;
@@ -31,20 +32,31 @@ impl<'a> From<Span<'a>> for Position{
 }
 
 fn identifier(text:Span) ->IResult<Span, String>{
-    let (text, a) =take_while1(|c| {is_alphabetic(c as u8)||c=='_'})(text)?;
-    let (text, b) =take_while(|c| {is_alphanumeric(c as u8)||c=='_'})(text)?;
+    let (text, a) =take_while1(|c:char| {c.is_alphabetic()||c=='_'})(text)?;
+    let (text, b) =take_while(|c:char| {c.is_alphanumeric()||c=='_'})(text)?;
 
     Ok((text, format!("{}{}",a,b)))
 }
 
 fn parameter_text(text:Span) ->IResult<Span, String>{
-    let (text, par) =take_while1(|c| {is_alphanumeric(c as u8)||c=='_'})(text)?;
+    let (text, par) =take_while1(|c:char| {c.is_alphanumeric()||c=='_'})(text)?;
     Ok((text, format!("{}",par)))
+}
+
+fn percent_encoding(text:Span) ->IResult<Span, String>{
+    let (text, _percent) =tag("%")(text)?;
+    let (text, hex) = cut(take_while_m_n(2, 2, |c:char| c.is_digit(16)))(text)?;
+    Ok((text, format!("%{}",hex)))
 }
 
 fn tilde_entity(text:Span) ->IResult<Span, String>{
     let (text, _tilde) = tag("~")(text)?;
     Ok((text, "~".to_owned()))
+}
+
+fn minus_entity(text:Span) ->IResult<Span, String>{
+    let (text, _tilde) = tag("_")(text)?;
+    Ok((text, "-".to_owned()))
 }
 
 fn negative_number_entity(text:Span) ->IResult<Span, String>{
@@ -55,14 +67,22 @@ fn negative_number_entity(text:Span) ->IResult<Span, String>{
 fn parameter_entity(text:Span) ->IResult<Span, String>{
     let (text, _start) = tag("~")(text)?;
     let position:Position = text.into();
-    let (text, entity) = cut(alt((tilde_entity, negative_number_entity)))(text)?;
+    let (text, entity) = cut(alt((
+        tilde_entity,
+        minus_entity,
+        negative_number_entity)))(text)?;
     Ok((text, format!("{}",entity)))
 }
 
 fn parameter(text:Span) ->IResult<Span, ActionParameter>{
     let position:Position = text.into();
-    let (text, par) =many0(alt((parameter_text, parameter_entity)))(text)?;
-    Ok((text, ActionParameter::new_parsed(par.join(""), position)))
+    let (text, par) =many0(alt((parameter_text, parameter_entity, percent_encoding)))(text)?;
+//    let err: nom::Err<(Span, nom::error::ErrorKind)> = nom::error::make_error(text, nom::error::ErrorKind::Escaped);
+    let par = par.join("");
+    let par = percent_decode_str(&par).decode_utf8().map_err(|e| 
+        nom::Err::Failure(nom::error::ParseError::from_error_kind(text, nom::error::ErrorKind::Escaped)))?;
+
+    Ok((text, ActionParameter::new_parsed(par.to_string(), position)))
 }
 
 
@@ -154,5 +174,15 @@ mod tests{
         }
         Ok(())
     }
+    #[test]
+    fn parse_escaped_parameter_test() -> Result<(), Box<dyn std::error::Error>>{
+        let (remainder,param)  = parameter(Span::new("abc~~~_~0%21"))?;
+        match &param{
+            ActionParameter::String(s,_)=>assert_eq!(s,"abc~--0!"),
+            _ => assert!(false)
+        }
+        Ok(())
+    }
+
 
 }
