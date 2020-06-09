@@ -18,6 +18,7 @@ pub mod error;
 pub mod query;
 pub mod parse;
 pub mod action_registry;
+pub mod formats;
 
 #[cfg(test)]
 mod tests {
