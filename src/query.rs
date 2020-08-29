@@ -41,7 +41,12 @@ impl ActionParameter{
     pub fn new_parsed(parameter:String, position:Position)->ActionParameter{
         ActionParameter::String(parameter, position)
     }
-
+    pub fn to_string(&self)->String{
+        match self {
+            ActionParameter::String(s,_) => s.to_string(),
+            ActionParameter::Link(s,_) => s.to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,6 +56,66 @@ pub struct ActionRequest{
     pub parameters: Vec<ActionParameter>
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SegmentHeader{
+    pub name:String,
+    pub level:usize,
+    pub position:Position,
+    pub parameters: Vec<ActionParameter>
+}
+
+impl SegmentHeader{
+    pub fn new_parsed_minimal(level:usize, position:Position)->Self{
+        SegmentHeader{
+            name: String::new(),
+            level: level,
+            position: position,
+            parameters: vec![]
+        }
+    }
+    pub fn new_parsed_from_action_request(level:usize, position:Position, action_request:&ActionRequest)->Self{
+        SegmentHeader{
+            name: action_request.name.to_owned(),
+            level: level,
+            position: position,
+            parameters: action_request.parameters.clone()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QuerySegment{
+    pub header: Option<SegmentHeader>,
+    pub query: Vec<ActionRequest>
+}
+
+impl QuerySegment{
+    pub fn new() -> QuerySegment{
+        QuerySegment{
+            header:None,
+            query:vec![]
+        }
+    }
+    pub fn new_from(header:Option<SegmentHeader>, query:Vec<ActionRequest>) -> QuerySegment{
+        QuerySegment{
+            header:header,
+            query:query
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Query{
+    pub segments: Vec<QuerySegment>
+}
+
+impl Query{
+    pub fn new() -> Query{
+        Query{
+            segments:vec![]
+        }
+    }
+}
 #[derive(Debug)]
 pub struct ActionParametersSlice<'a>(pub &'a [ActionParameter]);
 

@@ -7,6 +7,8 @@ use core::fmt::Display;
 use std::ops::Fn;
 use std::collections::HashMap;
 
+use crate::parse::parse_query_simple;
+
 pub trait CallableAction<T>{
     fn call_action(&self, input:T, arguments:&Vec<ActionParameter>) -> Result<T, Error>;
 }
@@ -132,7 +134,7 @@ impl<T> HashMapActionRegistry<T>{
 
 impl<T> Environment<T> for HashMapActionRegistry<T>{
     fn eval(&mut self, input:T, query:&str)->Result<T,Error>{
-        let path = crate::parse::parse_query(query)?;
+        let path = parse_query_simple(query)?;
 
         let mut value = input;
         for action_request in path{
