@@ -63,7 +63,7 @@ fn negative_number_entity(text: Span) -> IResult<Span, String> {
     Ok((text, format!("-{}", number)))
 }
 
-fn parameter_entity(text: Span) -> IResult<Span, String> {
+fn entities(text: Span) -> IResult<Span, String> {
     let (text, _start) = tag("~")(text)?;
     let position: Position = text.into();
     let (text, entity) = cut(alt((tilde_entity, minus_entity, negative_number_entity)))(text)?;
@@ -72,7 +72,7 @@ fn parameter_entity(text: Span) -> IResult<Span, String> {
 
 fn parameter(text: Span) -> IResult<Span, ActionParameter> {
     let position: Position = text.into();
-    let (text, par) = many0(alt((parameter_text, parameter_entity, percent_encoding)))(text)?;
+    let (text, par) = many0(alt((parameter_text, entities, percent_encoding)))(text)?;
     //    let err: nom::Err<(Span, nom::error::ErrorKind)> = nom::error::make_error(text, nom::error::ErrorKind::Escaped);
     let par = par.join("");
     let par = percent_decode_str(&par).decode_utf8().map_err(|e| {
