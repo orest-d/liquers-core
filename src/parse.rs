@@ -85,7 +85,7 @@ fn parameter(text: Span) -> IResult<Span, ActionParameter> {
     Ok((text, ActionParameter::new_parsed(par.to_string(), position)))
 }
 
-fn parse_action(text: Span) -> IResult<Span, ActionRequest> {
+fn parse_action_request(text: Span) -> IResult<Span, ActionRequest> {
     let position: Position = text.into();
     let (text, name) = identifier(text)?;
     let (text, p) = many0(pair(tag("-"), parameter))(text)?;
@@ -101,11 +101,11 @@ fn parse_action(text: Span) -> IResult<Span, ActionRequest> {
 }
 
 fn parse_action_path(text: Span) -> IResult<Span, Vec<ActionRequest>> {
-    separated_list(tag("/"), parse_action)(text)
+    separated_list(tag("/"), parse_action_request)(text)
 }
 
 fn parse_action_path_nonempty(text: Span) -> IResult<Span, Vec<ActionRequest>> {
-    separated_nonempty_list(tag("/"), parse_action)(text)
+    separated_nonempty_list(tag("/"), parse_action_request)(text)
 }
 
 fn parse_segment_indicator(text: Span) -> IResult<Span, usize> {
@@ -115,7 +115,7 @@ fn parse_segment_indicator(text: Span) -> IResult<Span, usize> {
 fn parse_segment_header(text: Span) -> IResult<Span, SegmentHeader> {
     let position: Position = text.into();
     let (text, level) = parse_segment_indicator(text)?;
-    let (text, opt_request) = opt(parse_action)(text)?;
+    let (text, opt_request) = opt(parse_action_request)(text)?;
     if let Some(request) = opt_request{
         Ok((text, SegmentHeader::new_parsed_from_action_request(level, position, &request)))
     }
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn parse_action_test() -> Result<(), Box<dyn std::error::Error>> {
-        let (_remainder, action) = parse_action(Span::new("abc-def"))?;
+        let (_remainder, action) = parse_action_request(Span::new("abc-def"))?;
         assert_eq!(action.name, "abc");
         assert_eq!(action.parameters.len(), 1);
         match &action.parameters[0] {
